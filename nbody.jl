@@ -259,8 +259,8 @@ function run_simulation!(
 	position::AA, 
 	velocity::AA,
 	mass::AA;
-	num_orbit::Int = 5,
-	Δt::AF = 1., 
+	num_orbit::Int = 50,
+	Δt::AF = 0.1, 
 	integrator!::Function = verlet!,
 )
 
@@ -344,8 +344,8 @@ function run_simulation_v2!(
 	position::AA, 
 	velocity::AA,
 	mass::AA;
-	num_orbit::Int = 5,
-	Δt::AF = 1., 
+	num_orbit::Int = 50,
+	Δt::AF = 0.1, 
 	integrator!::Function = verlet!,
 	save_stride::Int = 10
 )
@@ -460,8 +460,8 @@ function run_simulation_ttv!(
 	position::AA, 
 	velocity::AA,
 	mass::AA;
-	num_orbit::Int = 5,
-	Δt::AF = 1., 
+	num_orbit::Int = 50,
+	Δt::AF = 0.1, 
 	integrator!::Function = verlet!,
 )
 
@@ -537,94 +537,91 @@ function run_simulation_ttv!(
 		set_equal!(pos₋₁, pos₀)
 		set_equal!(vel₋₁, vel₀)
 		set_equal!(acc₋₁, acc₀)
-		
+
 	end
 	
-	return nothing
+	return tₕ
 	
 end
+
+# ╔═╡ aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
+begin
+	run_simulation_ttv!(position, velocity, mass; num_orbit=1, Δt=1.);
+	@time run_simulation_ttv!(position, velocity, mass; num_orbit=100, Δt=.01);
+end;
 
 # ╔═╡ de847e21-91e0-4269-8804-e6a56d94108f
 begin
 	run_simulation!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation!(position, velocity, mass; num_orbit=50, Δt=0.01);
+	@time run_simulation!(position, velocity, mass; num_orbit=100, Δt=1. );
 end;
 
 # ╔═╡ 6c3986e5-af34-4877-893f-c502fe1fdb96
 begin
 	run_simulation_v2!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation_v2!(position, velocity, mass; num_orbit=50, Δt=0.01);
-end;
-
-# ╔═╡ aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
-begin
-	run_simulation_ttv!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation_ttv!(position, velocity, mass; num_orbit=50, Δt=0.01);
+	@time run_simulation_v2!(position, velocity, mass; num_orbit=100, Δt=1. );
 end;
 
 # ╔═╡ c8b632e6-b397-4359-9394-e7ec903f1ee3
-t, p, trᵢ = run_simulation_v2!(position, velocity, mass; num_orbit=50, Δt=0.01);
-
-# ╔═╡ 91ae03b1-34d9-4edc-83ca-0653078d65ae
-size(p)
+# t, p, trᵢ = run_simulation_v2!(position, velocity, mass; num_orbit=50, Δt=0.01);
 
 # ╔═╡ 39e58870-a0b6-4ae5-a66c-85be1756c2aa
-begin
-	local ii
-	@gif for ii in 501:50:size(p)[3]
-		plot(
-			@view(p[1, :, ii])', 
-			@view(p[2, :, ii])',
-			st=:scatter,
-			ms=5,
-			label = nothing
-		)
+# begin
+# 	local ii
+# 	@gif for ii in 501:50:size(p)[3]
+# 		plot(
+# 			@view(p[1, :, ii])', 
+# 			@view(p[2, :, ii])',
+# 			st=:scatter,
+# 			ms=5,
+# 			label = nothing
+# 		)
 		
-		plot!(
-			@view(p[1, :, ii-100:ii])', 
-			@view(p[2, :, ii-100:ii])',
-			label = nothing,
-			xlabel = "AU",
-			ylabel = "AU"
-		)
+# 		plot!(
+# 			@view(p[1, :, ii-100:ii])', 
+# 			@view(p[2, :, ii-100:ii])',
+# 			label = nothing,
+# 			xlabel = "AU",
+# 			ylabel = "AU"
+# 		)
 
-		xlims!(-6, 6)
-		ylims!(-6, 6)
-	end
-end
+# 		xlims!(-6, 6)
+# 		ylims!(-6, 6)
+# 	end
+# end
 
 # ╔═╡ 2726c764-4256-46a7-badd-07e29a5136cb
-begin
-	a = zeros(Float64, 3, 8)
-	b = fill(9., (3, 8))
+# begin
+# 	a = zeros(Float64, 3, 8)
+# 	b = fill(9., (3, 8))
 
-	function update!(a, b)
-		a .= @view(b[:, :])
-	end
+# 	function update!(a, b)
+# 		a .= @view(b[:, :])
+# 	end
 
-	function update2!(a, b)
-		a .= b
-	end
+# 	function update2!(a, b)
+# 		a .= b
+# 	end
 
-	function update3!(a, b)
-		@inbounds for i ∈ length(a)
-			a[i] = b[i]
-		end
-	end
+# 	function update3!(a, b)
+# 		@inbounds @simd for i ∈ length(a)
+# 			a[i] = b[i]
+# 		end
+# 	end
 	
-	update!([0, 0], [0, 0])
-	update2!([0, 0], [0, 0])
-	update3!([0, 0], [0, 0])
-end;
+# 	update!([0, 0], [0, 0])
+# 	update2!([0, 0], [0, 0])
+# 	update3!([0, 0], [0, 0])
+# end;
 
 # ╔═╡ 5316d985-9bb2-4677-99d7-7e6f076debae
-@benchmark update!($a, $b)
+# @benchmark update!($a, $b)
 
 # ╔═╡ c0fdc933-5c35-496c-be07-f4623a0a0690
-@benchmark update2!($a, $b)
+# @benchmark update2!($a, $b)
 
 # ╔═╡ a48be474-0186-4eab-b062-580b31cea91a
-@benchmark update3!($a, $b)
+# @benchmark update3!($a, $b)
 
 # ╔═╡ Cell order:
 # ╠═94053080-c5c5-11ec-2e39-638d9d7701a9
@@ -651,11 +648,10 @@ end;
 # ╠═2a8e8994-55c0-4cd8-ae1c-a65b475ce0c1
 # ╠═a9392090-931e-42bb-89a7-71a9d887d912
 # ╠═a8aafe81-9cfd-403f-8db4-365c50b38418
+# ╠═aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
 # ╠═de847e21-91e0-4269-8804-e6a56d94108f
 # ╠═6c3986e5-af34-4877-893f-c502fe1fdb96
-# ╠═aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
 # ╠═c8b632e6-b397-4359-9394-e7ec903f1ee3
-# ╠═91ae03b1-34d9-4edc-83ca-0653078d65ae
 # ╠═39e58870-a0b6-4ae5-a66c-85be1756c2aa
 # ╠═2726c764-4256-46a7-badd-07e29a5136cb
 # ╠═5316d985-9bb2-4677-99d7-7e6f076debae
