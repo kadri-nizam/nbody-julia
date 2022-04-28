@@ -24,6 +24,12 @@ begin
 	AF = AbstractFloat
 end;
 
+# ╔═╡ c7d5948a-722f-406d-8fc8-2e56d83e647a
+begin
+	using Random
+	using Distributions
+end
+
 # ╔═╡ 216c518e-a625-4c1a-9164-a8e47ae56e89
 md"""
 We will either operate in the meter-kilogram-seconds regime or in the AU-M⊙-day regime. The latter will is favoured for the nicer numbers.
@@ -74,12 +80,35 @@ end
 # ╔═╡ 87b70d89-25b6-41fb-8d1c-788910ad12d5
 bodies = Dict(
 	:sun => CelestialBody(KG_PER_SOLAR, [0., 0., 0.], [0., 0., 0.]),
-	:mercury => CelestialBody(3.285E+23, [0., 5.7E+10, 0.], [-4.7e4, 0., 0.]),
-	:venus => CelestialBody(4.867_3e24, [0., 1.082_10e11, 0.], [-3.5e4, 0., 0.]),
+	# :mercury => CelestialBody(3.285E+23, [0., 5.7E+10, 0.], [-4.7e4, 0., 0.]),
+	# :venus => CelestialBody(4.867_3e24, [0., 1.082_10e11, 0.], [-3.5e4, 0., 0.]),
 	:earth => CelestialBody(5.972_2e24, [0., METER_PER_AU, 0.], [-3.0e4, 0., 0.]),
-	:mars => CelestialBody(2.4e24, [0., 2.2E+11, 0.], [-2.4e4, 0., 0.]),
-	:ohno => CelestialBody(11 * 1E+26, [2.2E+11, -5E+11, 0.], [-1e4, 1.2e4, 0.])
+	# :mars => CelestialBody(2.4e24, [0., 2.2E+11, 0.], [-2.4e4, 0., 0.]),
+	:jupiter => CelestialBody(1.898e27, [0., 5.204*METER_PER_AU, 0.], [-1.3e4, 0., 0.]),
+	# :ohno => CelestialBody(11 * 1E+26, [2.2E+11, -5E+11, 0.], [-1e4, 1.2e4, 0.])
 )
+
+# ╔═╡ 91b67218-df27-4246-a006-917695bed49c
+function polar_to_cartesian(r::AF, θ::AF)
+	return r*cos(θ), r*sin(θ)
+end
+
+# ╔═╡ 167fb8a7-8cad-44d7-9dbe-235946326928
+begin
+	for ii ∈ 1:30
+		
+		x, y = polar_to_cartesian(
+			rand(Uniform(1, 6)) * METER_PER_AU,
+			rand(Uniform(0, 2π))
+		)
+		
+		bodies[Symbol(ii)] = CelestialBody(
+			1e23,
+			[x, y, 0.],
+			[-1.3e4, 0., 0.]
+		)
+	end
+end
 
 # ╔═╡ 65f28245-a1cf-4b94-a7b2-23227fc88ad0
 md"""
@@ -547,20 +576,23 @@ end
 # ╔═╡ aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
 begin
 	run_simulation_ttv!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation_ttv!(position, velocity, mass; num_orbit=100, Δt=.01);
+	@time run_simulation_ttv!(position, velocity, mass; num_orbit=100, Δt=0.1);
 end;
 
 # ╔═╡ de847e21-91e0-4269-8804-e6a56d94108f
 begin
 	run_simulation!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation!(position, velocity, mass; num_orbit=100, Δt=1. );
+	@time run_simulation!(position, velocity, mass; num_orbit=100, Δt=0.1);
 end;
 
 # ╔═╡ 6c3986e5-af34-4877-893f-c502fe1fdb96
 begin
 	run_simulation_v2!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation_v2!(position, velocity, mass; num_orbit=100, Δt=1. );
+	@time run_simulation_v2!(position, velocity, mass; num_orbit=100, Δt=0.1);
 end;
+
+# ╔═╡ f2146275-43a8-4d58-94df-630f3c21922f
+p, _, _, _ = run_simulation!(position, velocity, mass; num_orbit=500, Δt=1.);
 
 # ╔═╡ c8b632e6-b397-4359-9394-e7ec903f1ee3
 # t, p, trᵢ = run_simulation_v2!(position, velocity, mass; num_orbit=50, Δt=0.01);
@@ -568,7 +600,7 @@ end;
 # ╔═╡ 39e58870-a0b6-4ae5-a66c-85be1756c2aa
 # begin
 # 	local ii
-# 	@gif for ii in 501:50:size(p)[3]
+# 	anim = @animate for ii in 50_000:100:size(p)[3]
 # 		plot(
 # 			@view(p[1, :, ii])', 
 # 			@view(p[2, :, ii])',
@@ -578,16 +610,18 @@ end;
 # 		)
 		
 # 		plot!(
-# 			@view(p[1, :, ii-100:ii])', 
-# 			@view(p[2, :, ii-100:ii])',
+# 			@view(p[1, :, ii-200:ii])', 
+# 			@view(p[2, :, ii-200:ii])',
 # 			label = nothing,
 # 			xlabel = "AU",
 # 			ylabel = "AU"
 # 		)
 
-# 		xlims!(-6, 6)
-# 		ylims!(-6, 6)
+# 		xlims!(-10, 10)
+# 		ylims!(-10, 10)
 # 	end
+
+# 	gif(anim, "plutinos.gif", fps = 15)
 # end
 
 # ╔═╡ 2726c764-4256-46a7-badd-07e29a5136cb
@@ -631,6 +665,9 @@ end;
 # ╟─0982b961-eef9-433b-806c-2d8c03a1de7c
 # ╠═bce0259d-03fc-4422-b4ff-c2ab5f513f40
 # ╠═87b70d89-25b6-41fb-8d1c-788910ad12d5
+# ╠═c7d5948a-722f-406d-8fc8-2e56d83e647a
+# ╠═91b67218-df27-4246-a006-917695bed49c
+# ╠═167fb8a7-8cad-44d7-9dbe-235946326928
 # ╟─65f28245-a1cf-4b94-a7b2-23227fc88ad0
 # ╠═286ba8b0-1bf7-41ad-bac6-837f50f265c0
 # ╠═d3da79cd-c73a-4276-aa3b-7df06c27e840
@@ -651,6 +688,7 @@ end;
 # ╠═aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
 # ╠═de847e21-91e0-4269-8804-e6a56d94108f
 # ╠═6c3986e5-af34-4877-893f-c502fe1fdb96
+# ╠═f2146275-43a8-4d58-94df-630f3c21922f
 # ╠═c8b632e6-b397-4359-9394-e7ec903f1ee3
 # ╠═39e58870-a0b6-4ae5-a66c-85be1756c2aa
 # ╠═2726c764-4256-46a7-badd-07e29a5136cb
