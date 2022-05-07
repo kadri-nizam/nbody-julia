@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.2
+# v0.19.3
 
 using Markdown
 using InteractiveUtils
@@ -16,6 +16,7 @@ begin
 	using CUDA
 	using PlutoUI
 	using Plots
+	using Polyester
 	using StaticArrays
 
 	import LinearAlgebra: norm
@@ -80,10 +81,10 @@ end
 # ╔═╡ 87b70d89-25b6-41fb-8d1c-788910ad12d5
 bodies = Dict(
 	:sun => CelestialBody(KG_PER_SOLAR, [0., 0., 0.], [0., 0., 0.]),
-	# :mercury => CelestialBody(3.285E+23, [0., 5.7E+10, 0.], [-4.7e4, 0., 0.]),
-	# :venus => CelestialBody(4.867_3e24, [0., 1.082_10e11, 0.], [-3.5e4, 0., 0.]),
+	:mercury => CelestialBody(3.285E+23, [0., 5.7E+10, 0.], [-4.7e4, 0., 0.]),
+	:venus => CelestialBody(4.867_3e24, [0., 1.082_10e11, 0.], [-3.5e4, 0., 0.]),
 	:earth => CelestialBody(5.972_2e24, [0., METER_PER_AU, 0.], [-3.0e4, 0., 0.]),
-	# :mars => CelestialBody(2.4e24, [0., 2.2E+11, 0.], [-2.4e4, 0., 0.]),
+	:mars => CelestialBody(2.4e24, [0., 2.2E+11, 0.], [-2.4e4, 0., 0.]),
 	:jupiter => CelestialBody(1.898e27, [0., 5.204*METER_PER_AU, 0.], [-1.3e4, 0., 0.]),
 	# :ohno => CelestialBody(11 * 1E+26, [2.2E+11, -5E+11, 0.], [-1e4, 1.2e4, 0.])
 )
@@ -95,7 +96,7 @@ end
 
 # ╔═╡ 167fb8a7-8cad-44d7-9dbe-235946326928
 begin
-	for ii ∈ 1:30
+	for ii ∈ 1:50
 		
 		x, y = polar_to_cartesian(
 			rand(Uniform(1, 6)) * METER_PER_AU,
@@ -172,9 +173,9 @@ function compute_acceleration!(acceleration::AA, position::AA, mass::AA)
 	N = length(mass)
 	for ii = 1:N
 		@view(acceleration[:, ii]) .= 0
-		@inbounds @simd for jj = 1:N		
+		@simd for jj = 1:N		
 			if ii ≠ jj
-				eq_of_motion!(
+				@inbounds eq_of_motion!(
 					@view(acceleration[:, ii]),
 					SVector{3, Float64}(@view(position[:, ii])),
 					SVector{3, Float64}(@view(position[:, jj])),
@@ -184,6 +185,32 @@ function compute_acceleration!(acceleration::AA, position::AA, mass::AA)
 		end
 	end
 	
+end
+
+# ╔═╡ 85b770fa-ca70-497a-9d6a-3e6dce318933
+function threaded_compute_acceleration!(
+	acceleration::AA, 
+	position::AA, 
+	mass::AA; 
+	T = Threads.nthreads()
+)
+	
+	N = length(mass)
+	
+	@batch minbatch=T for ii ∈ 1:N
+		@view(acceleration[:, ii]) .= 0
+		@simd for jj ∈ 1:N
+			if ii ≠ jj
+				@inbounds eq_of_motion!(
+					@view(acceleration[:, ii]),
+					SVector{3, Float64}(@view(position[:, ii])),
+					SVector{3, Float64}(@view(position[:, jj])),
+					mass[jj]
+				)
+			end
+		end
+	end
+
 end
 
 # ╔═╡ d966399c-b70e-43cc-a2eb-fa3e55e309e3
@@ -202,6 +229,18 @@ function verlet!(position::AA, velocity::AA, acceleration::AA, mass::AA, Δt::AF
 	
     velocity .+= acceleration .* 0.5Δt
     compute_acceleration!(acceleration, position, mass)
+	velocity .+= acceleration .* 0.5Δt
+
+    return nothing
+end
+
+# ╔═╡ 700f2bf3-74d2-43a7-98fd-18a84de119c3
+function threaded_verlet!(position::AA, velocity::AA, acceleration::AA, mass::AA, Δt::AF)
+    position .+= velocity .* Δt
+	position .+= acceleration .* 0.5Δt^2
+	
+    velocity .+= acceleration .* 0.5Δt
+    threaded_compute_acceleration!(acceleration, position, mass)
 	velocity .+= acceleration .* 0.5Δt
 
     return nothing
@@ -573,26 +612,35 @@ function run_simulation_ttv!(
 	
 end
 
-# ╔═╡ aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
-begin
-	run_simulation_ttv!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation_ttv!(position, velocity, mass; num_orbit=100, Δt=0.1);
-end;
-
 # ╔═╡ de847e21-91e0-4269-8804-e6a56d94108f
 begin
 	run_simulation!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation!(position, velocity, mass; num_orbit=100, Δt=0.1);
+	@time run_simulation!(position, velocity, mass; num_orbit=100, Δt=1.);
 end;
 
 # ╔═╡ 6c3986e5-af34-4877-893f-c502fe1fdb96
 begin
 	run_simulation_v2!(position, velocity, mass; num_orbit=1, Δt=1.);
-	@time run_simulation_v2!(position, velocity, mass; num_orbit=100, Δt=0.1);
+	@time run_simulation_v2!(position, velocity, mass; num_orbit=100, Δt=1.);
 end;
 
+# ╔═╡ aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
+begin
+	run_simulation_ttv!(position, velocity, mass; num_orbit=1, Δt=1.);
+	@time run_simulation_ttv!(position, velocity, mass; num_orbit=100, Δt=1.);
+end;
+
+# ╔═╡ 2a80b8d2-775b-4bd6-9e64-d182e9d7578d
+begin
+	run_simulation_ttv!(position, velocity, mass; num_orbit=1, Δt=1., integrator! = threaded_verlet!);
+	@time run_simulation_ttv!(position, velocity, mass; num_orbit=100, Δt=1., integrator! = threaded_verlet!);
+end;
+
+# ╔═╡ 057c8e39-8c1a-4991-8546-08de46b3bd06
+12.065/7.159
+
 # ╔═╡ f2146275-43a8-4d58-94df-630f3c21922f
-p, _, _, _ = run_simulation!(position, velocity, mass; num_orbit=500, Δt=1.);
+p, _, _, _ = run_simulation!(position, velocity, mass; num_orbit=100, Δt=1.);
 
 # ╔═╡ c8b632e6-b397-4359-9394-e7ec903f1ee3
 # t, p, trᵢ = run_simulation_v2!(position, velocity, mass; num_orbit=50, Δt=0.01);
@@ -674,8 +722,10 @@ p, _, _, _ = run_simulation!(position, velocity, mass; num_orbit=500, Δt=1.);
 # ╟─e3632e83-4e69-4373-82a6-336b535c07bb
 # ╠═7f9145ef-4585-4d85-8dee-4d01f0f8159a
 # ╠═3f58a3b7-03a9-47fc-8179-5405b0cecded
+# ╠═85b770fa-ca70-497a-9d6a-3e6dce318933
 # ╠═d966399c-b70e-43cc-a2eb-fa3e55e309e3
 # ╠═fe4f4cc3-059b-4d6d-882c-bba5267c7915
+# ╠═700f2bf3-74d2-43a7-98fd-18a84de119c3
 # ╠═d5da5f3f-86a5-4288-8c83-50b65af8ca02
 # ╟─b3dfb48b-c2f6-478a-bd56-8dabfbc671c7
 # ╠═812db9b0-1f54-408a-9545-febc08e3d492
@@ -685,9 +735,11 @@ p, _, _, _ = run_simulation!(position, velocity, mass; num_orbit=500, Δt=1.);
 # ╠═2a8e8994-55c0-4cd8-ae1c-a65b475ce0c1
 # ╠═a9392090-931e-42bb-89a7-71a9d887d912
 # ╠═a8aafe81-9cfd-403f-8db4-365c50b38418
-# ╠═aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
 # ╠═de847e21-91e0-4269-8804-e6a56d94108f
 # ╠═6c3986e5-af34-4877-893f-c502fe1fdb96
+# ╠═aefb3443-6d3d-4ed9-bd7b-cc91d7bebdc8
+# ╠═2a80b8d2-775b-4bd6-9e64-d182e9d7578d
+# ╠═057c8e39-8c1a-4991-8546-08de46b3bd06
 # ╠═f2146275-43a8-4d58-94df-630f3c21922f
 # ╠═c8b632e6-b397-4359-9394-e7ec903f1ee3
 # ╠═39e58870-a0b6-4ae5-a66c-85be1756c2aa
